@@ -3,6 +3,11 @@ from deepgram import AsyncDeepgramClient
 from deepgram.core import EventType
 import os
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
+
+from receptionist_ai import make_call
+from receptionist_ai.graph import agent
+
 load_dotenv()
 
 class DeepgramTranscriber:
@@ -17,7 +22,8 @@ class DeepgramTranscriber:
         cm = self.client.listen.v2.connect(
             model="flux-general-en",
             encoding="linear16",
-            sample_rate="16000"
+            sample_rate="16000",
+
         )
 
         # Enter it and store both the CM and connection
@@ -28,7 +34,13 @@ class DeepgramTranscriber:
         def on_message(message) -> None:
             print(f"DEBUG: Received message type: {getattr(message, 'type', 'Unknown')}")
             if hasattr(message, 'transcript') and message.transcript:
-                print(f"🎤 {message.transcript}")
+                # Calls the agent from the graph route
+                make_call.messages_state.append(HumanMessage(content=message.transcript))
+                result = agent.invoke({"messages": make_call.messages_state})
+                print(f"DEBUG: {result}")
+                make_call.messages_state = result["messages"]
+
+                print(message.transcript)
 
         self.connection.on(EventType.MESSAGE, on_message)
         self.connection.on(EventType.ERROR, lambda error: print(f"Deepgram Error: {error}"))

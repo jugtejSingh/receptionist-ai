@@ -4,7 +4,10 @@ import asyncio
 import sys
 
 from fastapi import FastAPI, Response, WebSocket
+from langchain_core.messages import SystemMessage
 from twilio.twiml.voice_response import VoiceResponse
+
+from receptionist_ai.prompts import SYSTEM_PROMPT
 from receptionist_ai.stt import DeepgramTranscriber
 
 app = FastAPI()
@@ -12,6 +15,7 @@ app = FastAPI()
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+messages_state = [SystemMessage(content=str(SYSTEM_PROMPT))]
 @app.post("/voice")
 def twilio_starting_connection():
     twiml = VoiceResponse()
@@ -19,6 +23,7 @@ def twilio_starting_connection():
         url="wss://unsprouted-starlike-roni.ngrok-free.dev/twilio/stream",
         track="inbound_track",
     )
+
     return Response(content=twiml.to_xml(), media_type="application/xml")
 
 @app.websocket("/twilio/stream")
@@ -65,6 +70,8 @@ async def twilio_stream(ws: WebSocket):
                 # 2. Feed it into FFmpeg's stdin
                 process.stdin.write(audio_bytes)
                 await process.stdin.drain()
+
+
 
             elif data['event'] == 'stop':
                 break

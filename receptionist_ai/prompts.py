@@ -1,4 +1,4 @@
-from nodes import initiliaser
+from receptionist_ai.nodes import initiliaser
 
 SYSTEM_PROMPT = (
     """
