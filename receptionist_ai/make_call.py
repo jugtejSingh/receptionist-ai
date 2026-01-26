@@ -74,6 +74,7 @@ async def twilio_stream(ws: WebSocket):
 
 
             elif data['event'] == 'stop':
+                print("we outie")
                 break
     except Exception as e:
         print(f"WebSocket Loop Error: {e}")
