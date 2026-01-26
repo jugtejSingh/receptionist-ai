@@ -1,27 +1,11 @@
-import os
-import logging
-
 from deepgram import DeepgramClient
 
-class DeepgramTTS:
-    def __init__(self):
-        self.deepgram = DeepgramClient(api_key=os.getenv("DEEPGRAM_API"))
-        self.response = None
-        self.name = "test.mp3"
+client = DeepgramClient()
 
-    def convertTextToAudio(self, text):
-        try:
-            self.response = self.deepgram.speak.v1.audio.generate(
-                text=text,
-                model="aura-2-thalia-en"
-            )
+response = client.speak.v1.audio.generate(
+    text="Hello, this is a sample text to speech conversion."
+)
 
-            # Save the audio file
-            with open(self.name, "wb") as audio_file:
-                audio_file.write(self.response.stream.getvalue())
-
-            print(f"Audio saved to test.mp3")
-            return self.name
-
-        except Exception as e:
-            print(f"Exception: {e}")
+# Save the audio file
+with open("output.mp3", "wb") as audio_file:
+    audio_file.write(response.stream.getvalue())

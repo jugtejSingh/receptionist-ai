@@ -29,7 +29,7 @@ def twilio_starting_connection():
 @app.websocket("/twilio/stream")
 async def twilio_stream(ws: WebSocket):
     await ws.accept()
-    print("✅ Twilio Connected")
+    stream_sid = None
 
     # Initialize and start Deepgram
     dg_transcriber = DeepgramTranscriber()
@@ -64,14 +64,18 @@ async def twilio_stream(ws: WebSocket):
             msg = await ws.receive_text()
             data = json.loads(msg)
 
+            if data['event'] == 'start':
+                stream_sid = data['start']['streamSid']
+                dg_transcriber.ws = ws
+                dg_transcriber.stream_sid = stream_sid
+                print("🎧 Stream started:", stream_sid)
+
             if data['event'] == 'media':
                 # 1. Decode Twilio's base64
                 audio_bytes = base64.b64decode(data['media']['payload'])
                 # 2. Feed it into FFmpeg's stdin
                 process.stdin.write(audio_bytes)
                 await process.stdin.drain()
-
-
 
             elif data['event'] == 'stop':
                 print("we outie")

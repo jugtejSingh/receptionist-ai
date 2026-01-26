@@ -1,22 +1,24 @@
 import asyncio
-from deepgram import AsyncDeepgramClient
+from deepgram import AsyncDeepgramClient, DeepgramClient
 from deepgram.core import EventType
 import os
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from receptionist_ai import make_call
+from receptionist_ai.audio_converter import convert_and_send_to_twilio
 from receptionist_ai.graph import agent
-from receptionist_ai.tts import DeepgramTTS
 
 load_dotenv()
 
 class DeepgramTranscriber:
-    def __init__(self):
+    def __init__(self, ws = None, stream_sid = None):
         self.client = AsyncDeepgramClient(api_key=os.getenv("DEEPGRAM_API"))
         self.connection = None
         self._cm = None
         self.deepgram_task = None
+        self.ws = ws
+        self.stream_sid = stream_sid
 
     async def start(self):
         """Initialize Deepgram connection"""
@@ -32,16 +34,30 @@ class DeepgramTranscriber:
         self._cm = cm  # Store it for later
 
         # Handle transcription messages
-        def on_message(message) -> None:
-            print(f"DEBUG: Received message type: {getattr(message, 'type', 'Unknown')}")
+        async def on_message(message) -> None:
             if hasattr(message, 'type') and message.type == 'TurnInfo':
                 if hasattr(message, 'event') and message.event == 'EndOfTurn':
                     # Calls the agent from the graph route
                     make_call.messages_state.append(HumanMessage(content=message.transcript))
                     result = agent.invoke({"messages": make_call.messages_state})
                     make_call.messages_state = result["messages"]
-                    deepgramTTS = DeepgramTTS()
-                    file_location = deepgramTTS.convertTextToAudio(make_call.messages_state[-1].content)
+                    print(make_call.messages_state[-1].content)
+                    # TTS CODE
+                    tts_client = AsyncDeepgramClient(api_key=os.getenv("DEEPGRAM_API"))
+
+                    response = tts_client.speak.v1.audio.generate(
+                        text=make_call.messages_state[-1].content
+                    )
+
+                    temp_mp3 = "temp_output.mp3"
+                    with open(temp_mp3, "wb") as audio_file:
+                        async for chunk in response:
+                            audio_file.write(chunk)
+
+                    await convert_and_send_to_twilio(temp_mp3,self.ws,self.stream_sid)
+
+                    if os.path.exists(temp_mp3):
+                        os.remove(temp_mp3)
 
 
         self.connection.on(EventType.MESSAGE, on_message)
